@@ -2,10 +2,9 @@ from __future__ import division
 import pcbnew
 import FootprintWizardBase
 
-# Dimensions from PCIe M.2 Specification rev 1.0 §2.3.5.2.
 keying = {
     "A": {
-        "KeyCenter": 6.625,  # Distance from the center of the footprint to the center of the key
+        "KeyCenter": 6.625,
         "PinMin": 8,
         "PinMax": 15,
     },
@@ -81,7 +80,6 @@ mPadTopHeight = pcbnew.FromMM(5.50)
 mPadBottomWidth = pcbnew.FromMM(6.0)
 mPadBottomHeight = pcbnew.FromMM(6.0 + 1.0)
 
-# Pad heights include the vertical offset.
 topPadHeight = pcbnew.FromMM(2.0)
 bottomPadHeight = pcbnew.FromMM(2.50)
 padVerticalOffset = pcbnew.FromMM(0.55)
@@ -256,10 +254,6 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
             msg = "Unknown second keying: %s (supported: %s)" % (second, ", ".join(sorted(keying.keys())))
             second.AddError(msg)
 
-
-
-        # if second key is "earlier" than the first key, swap them
-        # otherwise, there's some funky stuff happening?
         if first.value and second.value:
             if ord(first.value) > ord(second.value):
                 f, s = first.value, second.value
@@ -280,8 +274,8 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
                 msg = f"{width} is too small and not supported yet, expected >= 22"
                 width.AddError(msg)
 
-            if length.value < pcbnew.FromMM(8):
-                msg = f"{length} is too small and not supported yet, expected >= 22"
+            if length.value < pcbnew.FromMM(12):
+                msg = f"{length} is too small and not supported yet, expected >= 12"
                 length.AddError(msg)
 
 
@@ -322,7 +316,6 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
         outline.RemoveAllContours()
         outline.NewOutline()
 
-        # 转换并添加顶点
         for x, y in corners:
             outline.Append(x, y)
 
@@ -369,7 +362,6 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
 
         bottomEndpoints = []
 
-        # Left base
         topLeftX = -connectorTotalWidth / 2.0
         topLeftY = -connectorHeight
 
@@ -380,7 +372,7 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
 
         topLeftArcCenterX = topLeftArcStartX
         topLeftArcCenterY = topLeftArcStartY + connectorBaseArcRadius
-        topLeftArcAngle = 900 # decidegrees
+        topLeftArcAngle = 900
 
         self.Arc(topLeftArcCenterX, topLeftArcCenterY, topLeftArcStartX, topLeftArcStartY, topLeftArcAngle)
 
@@ -394,22 +386,15 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
 
         draw.Line(topLeftArcEndX, topLeftArcEndY, bottomLeftX, bottomLeftY)
 
-        KeyArcAngle = 1800 # decidegrees
+        KeyArcAngle = 1800
 
-        # small inline function for notch drawing
         def draw_key(KeyCenter):
             leftX = centerX + KeyCenter - keyDiameter / 2.0
             rightX = leftX + keyDiameter
             topY = centerY - keyHeight + keyDiameter / 2.0
-            # left line
             draw.Line(leftX, centerY, leftX, topY)
-            # right line
             draw.Line(rightX, centerY, rightX, topY)
-            # arc
             self.Arc(KeyCenter, topY, leftX, topY, KeyArcAngle)
-
-        # keys go from left to right and it's more comfortable to preserve this order
-        # so, leftmost (second) key first
 
         for key in [self.secondKey(), self.firstKey()]:
             if key:
@@ -433,7 +418,7 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
 
         topRightArcCenterX = topRightArcStartX + connectorBaseArcRadius
         topRightArcCenterY = topRightArcStartY
-        topRightArcAngle = 900 # decidegrees
+        topRightArcAngle = 900
 
         self.Arc(topRightArcCenterX, topRightArcCenterY, topRightArcStartX, topRightArcStartY, topRightArcAngle)
 
@@ -448,7 +433,7 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
         for endpoints in zip(bottomEndpoints[0::2], bottomEndpoints[1::2]):
             self.drawSolderMaskOpening(endpoints[0], endpoints[1], topPadHeight, pcbnew.F_Mask)
             self.drawSolderMaskOpening(endpoints[0], endpoints[1], bottomPadHeight, pcbnew.B_Mask)
-            draw.Line(endpoints[0], centerY, endpoints[1], centerY) # drawing the bottom lines
+            draw.Line(endpoints[0], centerY, endpoints[1], centerY)
 
         self.drawRuleAreaNoPour(bottomRightX, -bottomRightX, topPadHeight, pcbnew.F_Cu)
         self.drawRuleAreaNoPour(bottomRightX, -bottomRightX, bottomPadHeight, pcbnew.B_Cu)
@@ -464,30 +449,31 @@ class NGFF_FootprintWizard(FootprintWizardBase.FootprintWizard):
         width = self.GetParam("Size", "Width")
         length = self.GetParam("Size", "Length")
 
-        if width.value > connectorTotalWidth:
-            bottomBorderStartX = connectorTotalWidth / 2
-            bottomBorderStartY = -connectorHeight
-            bottomBorderEndX = connectorTotalWidth / 2.0 + (width.value - connectorTotalWidth) / 2.0
-            bottomBorderEndY = -connectorHeight
-            draw.Line(-bottomBorderStartX, bottomBorderStartY, -bottomBorderEndX, bottomBorderEndY)
-            draw.Line(bottomBorderStartX, bottomBorderStartY, bottomBorderEndX, bottomBorderEndY)
+        if width.value > 0 and length.value > 0:
+            if width.value > connectorTotalWidth:
+                bottomBorderStartX = connectorTotalWidth / 2
+                bottomBorderStartY = -connectorHeight
+                bottomBorderEndX = connectorTotalWidth / 2.0 + (width.value - connectorTotalWidth) / 2.0
+                bottomBorderEndY = -connectorHeight
+                draw.Line(-bottomBorderStartX, bottomBorderStartY, -bottomBorderEndX, bottomBorderEndY)
+                draw.Line(bottomBorderStartX, bottomBorderStartY, bottomBorderEndX, bottomBorderEndY)
 
-        leftBorderStartX = - connectorTotalWidth / 2.0 - (width.value - connectorTotalWidth) / 2.0
-        leftBorderStartY = -connectorHeight
-        leftBorderEndX = leftBorderStartX
-        leftBorderEndY = -length.value
-        topArcStartX = -pcbnew.FromMM(3.5 / 2.0)
-        draw.Line(leftBorderStartX, leftBorderStartY, leftBorderEndX, leftBorderEndY)
-        draw.Line(-leftBorderStartX, leftBorderStartY, -leftBorderEndX, leftBorderEndY)
-        draw.Line(leftBorderEndX, leftBorderEndY, topArcStartX, leftBorderEndY)
-        draw.Line(-leftBorderEndX, leftBorderEndY, -topArcStartX, leftBorderEndY)
+            leftBorderStartX = - connectorTotalWidth / 2.0 - (width.value - connectorTotalWidth) / 2.0
+            leftBorderStartY = -connectorHeight
+            leftBorderEndX = leftBorderStartX
+            leftBorderEndY = -length.value
+            topArcStartX = -pcbnew.FromMM(3.5 / 2.0)
+            draw.Line(leftBorderStartX, leftBorderStartY, leftBorderEndX, leftBorderEndY)
+            draw.Line(-leftBorderStartX, leftBorderStartY, -leftBorderEndX, leftBorderEndY)
+            draw.Line(leftBorderEndX, leftBorderEndY, topArcStartX, leftBorderEndY)
+            draw.Line(-leftBorderEndX, leftBorderEndY, -topArcStartX, leftBorderEndY)
 
-        self.Arc(0.0, -length.value, topArcStartX, -length.value, -1800)
+            self.Arc(0.0, -length.value, topArcStartX, -length.value, -1800)
 
-        pad = self.createMechanicalPad(length.value, pcbnew.F_Cu)
-        self.module.Add(pad)
+            pad = self.createMechanicalPad(length.value, pcbnew.F_Cu)
+            self.module.Add(pad)
 
-        pad = self.createMechanicalPad(length.value, pcbnew.B_Cu)
-        self.module.Add(pad)
+            pad = self.createMechanicalPad(length.value, pcbnew.B_Cu)
+            self.module.Add(pad)
 
 NGFF_FootprintWizard().register()
